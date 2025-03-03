@@ -1,4 +1,14 @@
-version: '3.8'
+version: '3'
+
+networks:
+  todo-network:
+    external: true
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  mysql_data:
+  traefik_certificates:
 
 services:
   traefik:
@@ -9,25 +19,36 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik/config:/etc/traefik
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./traefik/dynamic_conf.yaml:/etc/traefik/dynamic_conf.yaml
       - ./traefik/certificates:/certificates
     networks:
       - todo-network
     command:
-      - "--api.insecure=true"
+      - "--api=true"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--providers.file.filename=/etc/traefik/dynamic_conf.yaml"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=your@email.com"
+      - "--certificatesresolvers.myresolver.acme.email=onasanwoolasubomi@gmail.com"
       - "--certificatesresolvers.myresolver.acme.storage=/certificates/acme.json"
+    labels:
+      - "traefik.enable=false"
 
   frontend:
     build: ./frontend
     container_name: todo-frontend
+    expose:
+      - "80"
+    environment:
+      - AUTH_API_ADDRESS=https://auth.sdrock.xyz
+      - TODOS_API_ADDRESS=https://todos.sdrock.xyz
+      - USERS_API_ADDRESS=https://users.sdrock.xyz
     depends_on:
       - auth-api
       - todos-api
@@ -36,7 +57,7 @@ services:
       - todo-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`domain.com`)"
+      - "traefik.http.routers.frontend.rule=Host(`sdrock.xyz`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
@@ -44,7 +65,12 @@ services:
   auth-api:
     build: ./auth-api
     container_name: todo-auth-api
+    expose:
+      - "8081"
     environment:
+      - AUTH_API_PORT=8081
+      - JWT_SECRET=myfancysecret
+      - USERS_API_ADDRESS=http://users-api:8083
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=postgres
@@ -52,38 +78,50 @@ services:
       - DB_NAME=auth_db
     depends_on:
       - postgres
+      - users-api
     networks:
       - todo-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=Host(`auth.domain.com`)"
+      - "traefik.http.routers.auth.rule=Host(`auth.sdrock.xyz`)"
       - "traefik.http.routers.auth.entrypoints=websecure"
       - "traefik.http.routers.auth.tls.certresolver=myresolver"
-      - "traefik.http.services.auth.loadbalancer.server.port=8000"
+      - "traefik.http.services.auth.loadbalancer.server.port=8081"
 
   todos-api:
     build: ./todos-api
     container_name: todo-todos-api
+    expose:
+      - "8082"
     environment:
+      - JWT_SECRET=myfancysecret
       - MONGO_URI=mongodb://mongodb:27017/todos
-      - AUTH_API_URL=http://auth-api:8000
+      - AUTH_API_URL=http://auth-api:8081
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
     depends_on:
       - mongodb
       - auth-api
+      - redis
     networks:
       - todo-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.todos.rule=Host(`todos.domain.com`)"
+      - "traefik.http.routers.todos.rule=Host(`todos.sdrock.xyz`)"
       - "traefik.http.routers.todos.entrypoints=websecure"
       - "traefik.http.routers.todos.tls.certresolver=myresolver"
-      - "traefik.http.services.todos.loadbalancer.server.port=3000"
+      - "traefik.http.services.todos.loadbalancer.server.port=8082"
 
   users-api:
     build: ./users-api
     container_name: todo-users-api
+    expose:
+      - "8083"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/users_db
+      - SERVER_PORT=8083
+      - JWT_SECRET=myfancysecret
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/users_db?useSSL=false&allowPublicKeyRetrieval=true
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
     depends_on:
@@ -92,10 +130,10 @@ services:
       - todo-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.users.rule=Host(`users.domain.com`)"
+      - "traefik.http.routers.users.rule=Host(`users.sdrock.xyz`)"
       - "traefik.http.routers.users.entrypoints=websecure"
       - "traefik.http.routers.users.tls.certresolver=myresolver"
-      - "traefik.http.services.users.loadbalancer.server.port=8080"
+      - "traefik.http.services.users.loadbalancer.server.port=8083"
 
   log-message-processor:
     build: ./log-message-processor
@@ -103,6 +141,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
     depends_on:
       - redis
     networks:
@@ -127,7 +166,7 @@ services:
       - todo-network
 
   mongodb:
-    image: mongo:6-jammy
+    image: mongo:4.4
     container_name: todo-mongodb
     volumes:
       - mongodb_data:/data/db
@@ -144,12 +183,3 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - todo-network
-
-networks:
-  todo-network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-  mongodb_data:
-  mysql_data:

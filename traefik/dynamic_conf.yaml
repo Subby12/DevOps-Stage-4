@@ -1,0 +1,14 @@
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      
+  certificates:
+    # This section will be populated by Let's Encrypt
