@@ -61,6 +61,10 @@ services:
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=myresolver"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.frontend-login.rule=Host(`sdrock.xyz`) && Path(`/login`)"
+      - "traefik.http.routers.frontend-login.entrypoints=websecure"
+      - "traefik.http.routers.frontend-login.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend-login.service=auth-api@docker"
 
   auth-api:
     build: ./auth-api
@@ -86,7 +90,7 @@ services:
       - "traefik.http.routers.auth.rule=Host(`auth.sdrock.xyz`)"
       - "traefik.http.routers.auth.entrypoints=websecure"
       - "traefik.http.routers.auth.tls.certresolver=myresolver"
-      - "traefik.http.services.auth.loadbalancer.server.port=8081"
+      - "traefik.http.services.auth-api.loadbalancer.server.port=8081"
 
   todos-api:
     build: ./todos-api

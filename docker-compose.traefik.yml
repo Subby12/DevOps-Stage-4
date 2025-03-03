@@ -1,0 +1,31 @@
+version: '3'
+
+networks:
+  todo-network:
+    external: true
+
+services:
+  traefik:
+    image: traefik:v2.9
+    container_name: todo-traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./traefik/certificates:/certificates
+    networks:
+      - todo-network
+    command:
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=onasanwoolasubomi@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/certificates/acme.json"

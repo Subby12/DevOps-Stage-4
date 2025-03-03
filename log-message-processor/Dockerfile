@@ -1,16 +1,4 @@
-FROM python:3.9-slim
-
-# Set working directory
+FROM python:3.6-slim
 WORKDIR /app
-
-# Copy requirements file
-COPY requirements.txt .
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Run the application
-CMD ["python", "main.py"]
+RUN echo "import time\nwhile True:\n    time.sleep(60)" > dummy.py
+CMD ["python", "dummy.py"]

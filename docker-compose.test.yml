@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  test-nginx:
+    image: nginx:alpine
+    ports:
+      - "8888:80"
+    volumes:
+      - ./test:/usr/share/nginx/html
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.test.rule=Host(`sdrock.xyz`)"
+      - "traefik.http.routers.test.entrypoints=websecure"
+      - "traefik.http.routers.test.tls.certresolver=myresolver"
+      - "traefik.http.services.test.loadbalancer.server.port=80"
+    networks:
+      - todo-network
+
+networks:
+  todo-network:
+    external: true
